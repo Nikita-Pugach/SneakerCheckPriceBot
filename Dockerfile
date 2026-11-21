@@ -1,15 +1,19 @@
 FROM python:3.12-slim
 
-WORKDIR /app/sneaker_check_price_bot
-# ENV PYTHONPATH=/app/sneaker_check_price_bot/
+WORKDIR /app
 
-RUN pip install --upgrade pip
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    POETRY_VIRTUALENVS_CREATE=false \
+    POETRY_NO_INTERACTION=1
 
-COPY . /app/sneaker_check_price_bot/
+# Dependencies first, so the layer survives source changes.
+COPY pyproject.toml poetry.lock ./
+RUN pip install --upgrade pip poetry \
+    && poetry install --no-root --no-ansi
 
-RUN pip install poetry && \
-    poetry config virtualenvs.create false && \
-    poetry install --no-root --no-interaction
+COPY sneaker_bot ./sneaker_bot
 
-RUN python -m pip freeze
-
+# The bot reads its configuration from the environment (see .env.template):
+#   SECRET_TOKEN_BOT, ID_CHANNEL, NEWS_URL, MAX_PAGES, ...
+CMD ["python", "-m", "sneaker_bot.main"]

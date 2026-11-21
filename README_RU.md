@@ -38,7 +38,7 @@ SneakerCheckPriceBot — это современный Telegram-бот, кото
 
 ### 1. Клонируйте репозиторий
 ```bash
-git clone https://github.com/Kirill-cmd-ops/SneakerCheckPriceBot.git
+git clone https://github.com/Nikita-Pugach/SneakerCheckPriceBot.git
 cd SneakerCheckPriceBot
 ```
 
@@ -130,7 +130,7 @@ sneaker_bot/
 MIT License. Используйте код свободно, но с указанием автора.
 
 ## Контакты
-- Автор: [Kirill](https://github.com/Kirill-cmd-ops)
+- Автор: [Kirill](https://github.com/Kirill-cmd-ops) и [Nikita Pugach](https://github.com/Nikita-Pugach)
 - Telegram: [@SkForbes](https://t.me/SkForbes)
 
 ---

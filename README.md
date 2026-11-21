@@ -13,6 +13,7 @@ The bot works fully automatically, supports asynchronous request processing, and
 - 🔍 **Price check** — find the best deals for your favorite sneaker models.
 - 🆕 **News** — get the latest sneaker news from the past 24 hours.
 - ✅ **Subscription check** — access to features only for channel subscribers.
+- **Guided search** — the bot walks you through brand → model → size step by step, with a "show all" shortcut.
 - 🗂️ **User-friendly menu** — intuitive navigation with buttons.
 - ⚡ **Fast** — asynchronous processing, no delays.
 - 🛡️ **Security** — all keys and tokens are stored in .env.
@@ -31,14 +32,15 @@ The bot works fully automatically, supports asynchronous request processing, and
     - News
     - Order sneakers
     - Help
-4. When choosing "Check prices", the bot will ask for a model name and show results.
+4. When choosing "Check prices", the bot asks for the brand, then the model, then
+   the size, and shows matching offers — or everything at once via "show all".
 5. When choosing "News", the bot will show the latest news.
 
 ## Quick start
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/Kirill-cmd-ops/SneakerCheckPriceBot.git
+git clone https://github.com/Nikita-Pugach/SneakerCheckPriceBot.git
 cd SneakerCheckPriceBot
 ```
 
@@ -130,7 +132,7 @@ sneaker_bot/
 MIT License. Free to use with attribution.
 
 ## Contacts
-- Author: [Kirill](https://github.com/Kirill-cmd-ops)
+- Author: [Kirill](https://github.com/Kirill-cmd-ops) and [Nikita Pugach](https://github.com/Nikita-Pugach)
 - Telegram: [@SkForbes](https://t.me/SkForbes)
 
 ---

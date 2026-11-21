@@ -1,9 +1,14 @@
 [tool.poetry]
 name = "sneaker-bot"
-version = "0.1.0"
-description = ""
-authors = ["Kirill <bondarenkokirill150208@gmail.com>"]
+version = "0.2.0"
+description = "Telegram bot that compares sneaker prices across stores and delivers daily sneaker news."
+authors = [
+    "Kirill <bondarenkokirill150208@gmail.com>",
+    "Nikita Pugach <nikita.pugach2017@gmail.com>",
+]
+license = "MIT"
 readme = "README.md"
+keywords = ["telegram-bot", "sneakers", "price-comparison", "aiogram", "web-scraping"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
@@ -12,7 +17,6 @@ feedparser = "^6.0.11"
 bs4 = "^0.0.2"
 lxml = "^6.0.1"
 aiogram = "^3.22.0"
-
 
 [build-system]
 requires = ["poetry-core"]
