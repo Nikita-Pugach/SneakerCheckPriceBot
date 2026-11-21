@@ -40,6 +40,14 @@ Kufar is a classifieds board, so conditions and prices vary — it is there for
 coverage, not as a shop. A new store is a module in `sneaker_bot/parsers/` with a
 search function and a price extractor.
 
+### Crawling policy
+
+The bot reads only catalogue pages, paginates the way each store allows, waits
+between pages, keeps at most six product pages in flight and introduces itself
+with an honest user-agent. Both stores' `robots.txt` disallow their search
+endpoints; the bot never calls them. When a store answers 403, that answer is
+respected instead of bypassed with a headless browser.
+
 ## How the search flow works
 
 ```

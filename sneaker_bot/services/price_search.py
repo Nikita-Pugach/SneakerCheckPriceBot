@@ -21,7 +21,9 @@ from sneaker_bot.parsers.price_parser import (
     HEADERS,
     MAX_PAGES_BUNT,
     MAX_PAGES_SNEAK,
+    PAGE_DELAY,
     PER_CAT,
+    PRICE_CONCURRENCY,
     SNEAKERS,
     SUCCESS_STICKERS,
     extract_price,
@@ -98,6 +100,8 @@ async def process_price_search(
                         if page == 1
                         else urljoin(catalogue_url, f"/page/{page}/")
                     )
+                    if page > 1:
+                        await asyncio.sleep(PAGE_DELAY)
                     soup = await fetch_html(session, page_url)
                     if soup is None:
                         break
@@ -124,6 +128,8 @@ async def process_price_search(
                     if len(raw_sneakers[kind]) >= PER_CAT:
                         break
                     page_url = base if page == 1 else f"{base}?page={page}"
+                    if page > 1:
+                        await asyncio.sleep(PAGE_DELAY)
                     soup = await fetch_html(session, page_url)
                     if soup is None:
                         break
@@ -142,12 +148,20 @@ async def process_price_search(
                         if len(raw_sneakers[kind]) >= PER_CAT:
                             break
 
+            # Product pages are fetched with a cap on concurrency: a polite crawl
+            # instead of a hundred parallel requests at a small shop.
+            semaphore = asyncio.Semaphore(PRICE_CONCURRENCY)
+
+            async def priced(item):
+                async with semaphore:
+                    return await _price_of(session, item)
+
             bunt_prices = {
-                key: await asyncio.gather(*[_price_of(session, item) for item in items])
+                key: await asyncio.gather(*[priced(item) for item in items])
                 for key, items in raw_bunt.items()
             }
             sneaker_prices = {
-                key: await asyncio.gather(*[_price_of(session, item) for item in items])
+                key: await asyncio.gather(*[priced(item) for item in items])
                 for key, items in raw_sneakers.items()
             }
 

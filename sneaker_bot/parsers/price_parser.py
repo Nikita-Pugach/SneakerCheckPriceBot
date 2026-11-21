@@ -14,8 +14,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-HEADERS = {"User-Agent": os.getenv("USER_AGENT", "Mozilla/5.0")}
+HEADERS = {
+    # An honest bot user-agent, not a spoofed browser one. Both stores accept it.
+    "User-Agent": os.getenv("USER_AGENT")
+    or "SneakerCheckPriceBot/0.2 (+https://github.com/Nikita-Pugach/SneakerCheckPriceBot)"
+}
 PER_CAT = int(os.getenv("PER_CAT", 5))
+PAGE_DELAY = 0.4  # pause between catalogue pages, so one bot does not hammer a shop
+PRICE_CONCURRENCY = 6  # product pages are fetched a few at a time, not all at once
 BASE = os.getenv("BASE_URL", "")
 CATALOGS = [
     urljoin(BASE, os.getenv("CATALOG_MEN_PATH") or ""),
