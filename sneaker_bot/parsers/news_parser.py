@@ -10,9 +10,11 @@ import feedparser
 
 
 load_dotenv()
-LAST_HOURS = int(os.getenv("LAST_HOURS"))
-MAX_PAGES = int(os.getenv("MAX_PAGES"))
-NEWS_URL = os.getenv("NEWS_URL")
+# Defaults matter: without .env these lines used to raise TypeError at import,
+# so the whole bot refused to start instead of using sane values.
+LAST_HOURS = int(os.getenv("LAST_HOURS") or 24)
+MAX_PAGES = int(os.getenv("MAX_PAGES") or 3)
+NEWS_URL = os.getenv("NEWS_URL") or "https://sneakernews.com/feed"
 
 
 async def fetch_rss_page(session: aiohttp.ClientSession, page: int):
