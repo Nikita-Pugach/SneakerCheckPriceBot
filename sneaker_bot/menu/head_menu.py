@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
+REPO_URL = "https://github.com/Nikita-Pugach/SneakerCheckPriceBot"
+
 head_menu = InlineKeyboardMarkup(
     inline_keyboard=[
         [
@@ -14,14 +16,8 @@ head_menu = InlineKeyboardMarkup(
         ],
         [
             InlineKeyboardButton(
-                text="🔍Заказать кроссовки🔍",
-                callback_data="order_button"
-            )
-        ],
-        [
-            InlineKeyboardButton(
                 text="🤝Помощь🤝",
-                url="tg://resolve?domain=SkForbes"
+                url=REPO_URL
             )
         ],
     ]

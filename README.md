@@ -12,6 +12,14 @@ in one sitting.
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![tests](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml/badge.svg)](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml)
 
+## Screenshots
+
+![Main menu](docs/screenshots/menu.png)
+
+| Choosing a brand | Results |
+|---|---|
+| ![Brand buttons](docs/screenshots/brands.png) | ![Results](docs/screenshots/results.png) |
+
 ## What it does
 
 - **Price check** — searches several stores and shows matching offers with prices

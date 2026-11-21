@@ -12,6 +12,14 @@ Telegram-бот, который ищет и сравнивает цены на �
 ![License](https://img.shields.io/badge/license-MIT-green)
 [![tests](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml/badge.svg)](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml)
 
+## Скриншоты
+
+![Главное меню](docs/screenshots/menu.png)
+
+| Выбор бренда | Результаты |
+|---|---|
+| ![Кнопки брендов](docs/screenshots/brands.png) | ![Результаты](docs/screenshots/results.png) |
+
 ## Что умеет
 
 - **Проверка цен** — ищет по нескольким магазинам и показывает подходящие

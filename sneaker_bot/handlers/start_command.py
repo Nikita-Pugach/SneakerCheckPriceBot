@@ -15,13 +15,6 @@ router = Router()
 
 
 
-@router.message(lambda m: m.text and m.text.lower() == "debug_state")
-async def debug_state(message: Message, state: FSMContext):
-    data = await state.get_data()
-    print("STATE DEBUG:", data)
-    await message.answer("State printed to logs")
-
-
 @router.message(Command("start"))
 async def start_command(message: Message, state: FSMContext):
     user_id = message.from_user.id
