@@ -152,7 +152,7 @@ call it from the search flow.
 
 ## Authors
 
-- [Kirill](https://github.com/Kirill-cmd-ops) — parsers, handlers, news, the
+- [Kirill](https://github.com/Kirill-Unix) — parsers, handlers, news, the
   original bot.
 - [Nikita Pugach](https://github.com/Nikita-Pugach) — guided search flow (FSM),
   price parser fixes, configuration handling, packaging and docs.

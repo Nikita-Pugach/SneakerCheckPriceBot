@@ -150,7 +150,7 @@ sneaker_bot/
 
 ## Авторы
 
-- [Kirill](https://github.com/Kirill-cmd-ops) — парсеры, обработчики, новости,
+- [Kirill](https://github.com/Kirill-Unix) — парсеры, обработчики, новости,
   исходный бот.
 - [Nikita Pugach](https://github.com/Nikita-Pugach) — пошаговый поиск (FSM),
   исправления парсера цен, работа с конфигурацией, упаковка и документация.
