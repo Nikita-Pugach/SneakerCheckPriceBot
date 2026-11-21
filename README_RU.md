@@ -10,6 +10,7 @@ Telegram-бот, который ищет и сравнивает цены на �
 ![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0)
 ![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
 ![License](https://img.shields.io/badge/license-MIT-green)
+[![tests](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml/badge.svg)](https://github.com/Nikita-Pugach/SneakerCheckPriceBot/actions/workflows/tests.yml)
 
 ## Что умеет
 
