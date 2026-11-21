@@ -12,7 +12,7 @@ def build_result_text(fb: dict, fs: dict) -> str:
         for key, title in caps.items():
             items = data_dict.get(key, [])
             # фильтруем товары с нормальной ценой
-            filtered = [(t, price, url) for t, price, url in items if price not in ["–", "ошибка"]]
+            filtered = [(t, price, url) for t, price, url in items if price not in ["—", "–", "ошибка"]]
             if not filtered:
                 continue
 
