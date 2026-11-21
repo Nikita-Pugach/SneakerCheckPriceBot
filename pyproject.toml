@@ -24,3 +24,6 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# poetry install --no-root does not put the project on sys.path, and pytest only
+# adds the tests directory, so imports of sneaker_bot would fail in CI.
+pythonpath = ["."]
