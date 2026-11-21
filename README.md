@@ -28,6 +28,18 @@ in one sitting.
 An "order sneakers" flow (a link to the partner store) is planned but not
 implemented yet.
 
+## Sources
+
+| Store | How it is read |
+|---|---|
+| bunt.by | catalogue pages, then the product page for the price |
+| sneakers.by | catalogue pages, then the product page for the price |
+| kufar.by | its public JSON search API, prices come with the results |
+
+Kufar is a classifieds board, so conditions and prices vary — it is there for
+coverage, not as a shop. A new store is a module in `sneaker_bot/parsers/` with a
+search function and a price extractor.
+
 ## How the search flow works
 
 ```

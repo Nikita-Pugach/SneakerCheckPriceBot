@@ -13,6 +13,7 @@ from aiogram.types import CallbackQuery, Message
 from bs4 import BeautifulSoup
 
 from sneaker_bot.menu.know_menu import know_menu
+from sneaker_bot.parsers.kufar_parser import search as kufar_search
 from sneaker_bot.parsers.price_parser import (
     BASE,
     CATALOGS,
@@ -150,16 +151,24 @@ async def process_price_search(
                 for key, items in raw_sneakers.items()
             }
 
-        text = build_result_text(bunt_prices, sneaker_prices)
-        no_results = all(
-            len(items) == 0
-            for items in list(bunt_prices.values()) + list(sneaker_prices.values())
+            # Kufar returns prices in the search response, no product page needed.
+            extra: dict[str, list] = {}
+            kufar_items = await kufar_search(session, query, PER_CAT)
+            if kufar_items:
+                extra["kufar.by"] = kufar_items
+
+        text = build_result_text(bunt_prices, sneaker_prices, extra)
+        no_results = (
+            all(len(items) == 0 for items in bunt_prices.values())
+            and all(len(items) == 0 for items in sneaker_prices.values())
+            and not any(extra.values())
         )
         logger.info(
-            "price search finished for user %s: %s bunt, %s sneakers, no_results=%s",
+            "price search finished for user %s: %s bunt, %s sneakers, %s kufar, no_results=%s",
             user_id,
             sum(len(items) for items in bunt_prices.values()),
             sum(len(items) for items in sneaker_prices.values()),
+            len(extra.get("kufar.by", [])),
             no_results,
         )
 

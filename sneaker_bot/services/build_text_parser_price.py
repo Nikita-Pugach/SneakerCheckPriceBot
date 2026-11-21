@@ -1,4 +1,4 @@
-def build_result_text(fb: dict, fs: dict) -> str:
+def build_result_text(fb: dict, fs: dict, extra: dict | None = None) -> str:
     parts = []
     shops = [
         ("bunt.by", fb, {"muzhskie": "Мужские", "zhenskie": "Женские"}),
@@ -31,6 +31,21 @@ def build_result_text(fb: dict, fs: dict) -> str:
             parts.append("")
             parts.extend(shop_parts)
             parts.append("")
+
+    # Stores that already return priced items keep a simpler layout.
+    for shop_name, items in (extra or {}).items():
+        if not items:
+            continue
+        found_anywhere = True
+        parts.append(f"<b>Магазин:</b> {shop_name}")
+        parts.append("")
+        for idx, (title, price, url) in enumerate(items, start=1):
+            parts.append(
+                f"{idx}. {title}\n"
+                f"   Цена: <code>{price}</code>\n"
+                f"   <a href=\"{url}\">Ссылка</a>"
+            )
+        parts.append("")
 
     if not found_anywhere:
         return "Товар не найден ни в одном магазине."

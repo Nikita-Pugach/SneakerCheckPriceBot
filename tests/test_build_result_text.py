@@ -49,3 +49,16 @@ def test_both_shops_can_appear():
     text = build_result_text(bunt, sneakers)
     assert "<b>Магазин:</b> bunt.by" in text
     assert "<b>Магазин:</b> sneakers.by" in text
+
+
+def test_extra_store_section():
+    extra = {"kufar.by": [("Кроссовки Nike Air Max", "250 BYN", "https://kufar/item/1")]}
+    text = build_result_text(EMPTY_BUNT, EMPTY_SNEAKERS, extra)
+    assert "<b>Магазин:</b> kufar.by" in text
+    assert "1. Кроссовки Nike Air Max" in text
+    assert "Цена: <code>250 BYN</code>" in text
+    assert "не найден" not in text
+
+
+def test_extra_store_is_not_counted_as_a_result_when_empty():
+    assert build_result_text(EMPTY_BUNT, EMPTY_SNEAKERS, {"kufar.by": []}) == NOT_FOUND
