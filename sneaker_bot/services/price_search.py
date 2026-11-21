@@ -182,14 +182,6 @@ async def process_price_search(
                 disable_web_page_preview=True,
             )
 
-        for message in temporary:
-            try:
-                await query_ctx.bot.delete_message(
-                    chat_id=message["chat_id"], message_id=message["message_id"]
-                )
-            except TelegramBadRequest:
-                pass
-
     except asyncio.CancelledError:
         logger.info("price search cancelled for user %s", user_id)
         return
