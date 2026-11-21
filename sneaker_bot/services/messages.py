@@ -27,17 +27,29 @@ async def purge(state: FSMContext, bot) -> int:
     logged at debug level; anything else is a warning, never a silent pass.
     """
     data = await state.get_data()
-    sent = data.get("sent", [])
-    deleted = 0
+    # Older versions stored refs under separate keys; a chat that lived through
+    # them still has leftovers, so clean everything we know about.
+    refs = list(data.get("sent", []))
+    refs += data.get("msg_refs", [])
+    refs += data.get("prompt_refs", [])
+    if data.get("sticker_info"):
+        refs.append(data["sticker_info"])
 
-    for ref in sent:
+    deleted = 0
+    seen: set[tuple[int, int]] = set()
+
+    for ref in refs:
+        key = (ref.get("chat_id"), ref.get("message_id"))
+        if key in seen or key[0] is None or key[1] is None:
+            continue
+        seen.add(key)
         try:
-            await bot.delete_message(chat_id=ref["chat_id"], message_id=ref["message_id"])
+            await bot.delete_message(chat_id=key[0], message_id=key[1])
             deleted += 1
         except TelegramBadRequest as exc:
-            logger.debug("message %s already gone: %s", ref.get("message_id"), exc)
+            logger.debug("message %s already gone: %s", key[1], exc)
         except Exception as exc:
-            logger.warning("failed to delete message %s: %s", ref.get("message_id"), exc)
+            logger.warning("failed to delete message %s: %s", key[1], exc)
 
     await state.update_data(sent=[], prompt_refs=[], msg_refs=[], sticker_info=None)
     return deleted
