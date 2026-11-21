@@ -6,7 +6,7 @@ from aiogram.types import Message
 from sneaker_bot.menu.sub_menu import sub_menu
 from sneaker_bot.services.send_head_menu import send_head_menu
 from sneaker_bot.services.send_messages import record_and_send, send_prompt
-from sneaker_bot.services.utils import delete_all_prompts_and_sticker
+from sneaker_bot.services.messages import purge
 from sneaker_bot.setting import bot
 from sneaker_bot.sub_checker import checker_sub
 from sneaker_bot.tasks import tasks
@@ -31,23 +31,9 @@ async def start_command(message: Message, state: FSMContext):
     if task := tasks.pop(user_id, None):
         task.cancel()
 
-    # удаляем все ранее сохранённые сообщения (msg_refs) — если есть
-    data = await state.get_data()
-    msg_refs = data.get("msg_refs", [])
-    for ref in msg_refs:
-        try:
-            await bot.delete_message(ref["chat_id"], ref["message_id"])
-        except Exception:
-            pass
-
-    # очищаем состояние полностью
+    # убираем всё, что бот отправлял в этом чате, и очищаем состояние
+    await purge(state, bot)
     await state.clear()
-
-    # удаляем также подсказки и стикер, если где-то остались (на всякий случай)
-    try:
-        await delete_all_prompts_and_sticker(state, bot)
-    except Exception:
-        pass
 
     # отправляем стартовое сообщение / подсказку
     if not await checker_sub(bot, user_id):

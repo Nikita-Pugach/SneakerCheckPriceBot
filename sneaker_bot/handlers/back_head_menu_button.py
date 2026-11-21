@@ -1,12 +1,15 @@
 # handlers/back_head_menu_button.py
+import logging
+
 from aiogram import Router
 from aiogram.types import CallbackQuery
 from aiogram.exceptions import TelegramBadRequest
 
 from sneaker_bot.services.send_head_menu import send_head_menu
-from sneaker_bot.services.utils import delete_all_prompts_and_sticker
+from sneaker_bot.services.messages import purge
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 
 @router.callback_query(lambda c: c.data == "back_main")
@@ -17,9 +20,9 @@ async def back_head_menu_button(query: CallbackQuery, state):
         pass
 
     try:
-        await delete_all_prompts_and_sticker(state, query.bot)
-    except Exception:
-        pass
+        await purge(state, query.bot)
+    except Exception as exc:
+        logger.warning("purge failed: %s", exc)
 
     sent = await send_head_menu(
         query,

@@ -28,7 +28,8 @@ from sneaker_bot.parsers.price_parser import (
     find_title_and_link,
 )
 from sneaker_bot.services.build_text_parser_price import build_result_text
-from sneaker_bot.services.products import is_new
+from sneaker_bot.services.messages import track
+from sneaker_bot.services.products import is_footwear, is_new
 from sneaker_bot.services.send_messages import record_and_send
 from sneaker_bot.tasks import tasks
 
@@ -38,12 +39,6 @@ PRODUCT_CARD_SELECTOR = (
     "div[class*='product'], li[class*='product'], article[class*='product']"
 )
 ANY_CARD_SELECTOR = "div, li, article"
-
-
-async def _save_sticker_info(state: FSMContext, sticker_msg: Message) -> None:
-    await state.update_data(
-        sticker_info={"chat_id": sticker_msg.chat.id, "message_id": sticker_msg.message_id}
-    )
 
 
 async def _price_of(session: aiohttp.ClientSession, item: tuple[str, str]) -> tuple[str, str, str]:
@@ -76,12 +71,11 @@ async def process_price_search(
 ) -> None:
     """Search both stores for `query`, send a sticker and a result message."""
     logger.info("price search started for user %s, query=%r", user_id, query)
+    loading = None
     try:
-        temporary: list[dict] = []
         loading = await record_and_send(
             query_ctx, state, text="Ищем указанную модель кроссовок и схожие модели…"
         )
-        temporary.append({"chat_id": loading.chat.id, "message_id": loading.message_id})
 
         raw_bunt: dict[str, list] = {"muzhskie": [], "zhenskie": []}
         raw_sneakers: dict[str, list] = {"женские": [], "мужские": []}
@@ -113,6 +107,8 @@ async def process_price_search(
                         title, url = found
                         if query and query.strip() and query.lower() not in title.lower():
                             continue
+                        if not is_footwear(title):
+                            continue
                         if not is_new(seen_bunt, title, url):
                             continue
                         raw_bunt[key].append((title, url))
@@ -136,6 +132,8 @@ async def process_price_search(
                             continue
                         title, url = found
                         if query and query.strip() and query.lower() not in title.lower():
+                            continue
+                        if not is_footwear(title):
                             continue
                         if not is_new(seen_sneakers, title, url):
                             continue
@@ -169,7 +167,7 @@ async def process_price_search(
         sticker_message = await query_ctx.bot.send_sticker(
             chat_id=query_ctx.from_user.id, sticker=sticker
         )
-        await _save_sticker_info(state, sticker_message)
+        await track(state, sticker_message)
 
         if no_results:
             await record_and_send(
@@ -196,4 +194,15 @@ async def process_price_search(
         logger.info("price search cancelled for user %s", user_id)
         return
     finally:
+        # The loading message must disappear even if scraping blew up halfway;
+        # previously the cleanup lived after the try block and was skipped.
+        if loading is not None:
+            try:
+                await query_ctx.bot.delete_message(
+                    chat_id=loading.chat.id, message_id=loading.message_id
+                )
+            except TelegramBadRequest:
+                pass
+            except Exception as exc:
+                logger.warning("could not delete the loading message: %s", exc)
         tasks.pop(user_id, None)
