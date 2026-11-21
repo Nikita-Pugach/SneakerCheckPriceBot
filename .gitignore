@@ -1,3 +1,11 @@
 .idea
 .venv
 .env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env.*
+!.env.template
+
