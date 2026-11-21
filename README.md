@@ -1,140 +1,133 @@
 # SneakerCheckPriceBot
 
-[Read in Russian](./README_RU.md)
+A Telegram bot that finds and compares sneaker prices across stores and delivers
+the latest sneaker news — asynchronous, container-ready, and small enough to read
+in one sitting.
 
-Telegram bot for searching and comparing sneaker prices, as well as getting the latest sneaker news.
+[Русская версия](./README_RU.md)
 
-## Description
-SneakerCheckPriceBot is a modern Telegram bot that helps you quickly find up-to-date prices for sneakers from popular websites and stay informed about the latest industry news. The bot is designed for sneaker enthusiasts, resellers, collectors, and anyone who wants to save time searching for the best deals.
+![Python](https://img.shields.io/badge/Python-3.12-3776AB)
+![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0)
+![Docker](https://img.shields.io/badge/Docker-ready-2496ED)
+![License](https://img.shields.io/badge/license-MIT-green)
 
-The bot works fully automatically, supports asynchronous request processing, and is designed to handle many users at once.
+## What it does
 
-## Features
-- 🔍 **Price check** — find the best deals for your favorite sneaker models.
-- 🆕 **News** — get the latest sneaker news from the past 24 hours.
-- ✅ **Subscription check** — access to features only for channel subscribers.
-- **Guided search** — the bot walks you through brand → model → size step by step, with a "show all" shortcut.
-- 🗂️ **User-friendly menu** — intuitive navigation with buttons.
-- ⚡ **Fast** — asynchronous processing, no delays.
-- 🛡️ **Security** — all keys and tokens are stored in .env.
+- **Price check** — searches several stores and shows matching offers with prices
+  and links.
+- **Guided search** — instead of one free-text prompt the bot walks the user
+  through brand → model → size as a conversation (aiogram FSM), with a "show
+  everything" shortcut at every step.
+- **News** — the latest sneaker headlines for the last N hours, pulled from an
+  RSS feed.
+- **Subscription gate** — the bot checks that the user is subscribed to a channel
+  before unlocking the menu.
+- **Menu-driven UI** — inline keyboards, no commands to memorise beyond `/start`.
 
-## Usage examples
-- **/start** — start the bot, greeting and subscription check.
-- **Check prices** — the bot will ask for a model name and show found offers.
-- **News** — the bot will show the latest sneaker news.
-- **Order sneakers** — (coming soon) a link to the order website will be available.
+An "order sneakers" flow (a link to the partner store) is planned but not
+implemented yet.
 
-## Typical scenario
-1. User starts the bot with `/start`.
-2. If not subscribed to the channel, the bot will prompt to subscribe.
-3. After subscribing, the main menu opens:
-    - Check prices
-    - News
-    - Order sneakers
-    - Help
-4. When choosing "Check prices", the bot asks for the brand, then the model, then
-   the size, and shows matching offers — or everything at once via "show all".
-5. When choosing "News", the bot will show the latest news.
+## How the search flow works
+
+```
+/start → subscription check → main menu
+                                 │
+                    ┌────────────┴────────────┐
+                 Prices                     News
+                    │                         │
+        brand → model → size          last N hours
+                    │                         │
+             parse stores → offers      headlines
+```
+
+State machine: `aiogram.fsm`. Parsing: `aiohttp` + BeautifulSoup, one module per
+store, so adding a store means adding one function and registering it.
+
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| Language | Python 3.12 |
+| Bot framework | aiogram 3.x |
+| HTTP / parsing | aiohttp, BeautifulSoup, lxml |
+| News | feedparser |
+| Config | python-dotenv |
+| Packaging | Poetry |
+| Runtime | Docker (python:3.12-slim) |
 
 ## Quick start
 
-### 1. Clone the repository
 ```bash
 git clone https://github.com/Nikita-Pugach/SneakerCheckPriceBot.git
 cd SneakerCheckPriceBot
-```
-
-### 2. Install Poetry (if not installed)
-```bash
-pip install poetry
-```
-
-### 3. Install dependencies
-```bash
 poetry install
-```
-
-### 4. Create a `.env` file in the project root and add environment variables:
-
-#### Example .env
-```
-SECRET_TOKEN_BOT=your_bot_token
-ID_CHANNEL=@your_channel_id
-USER_AGENT=your_user_agent
-BASE_URL=https://example.com
-CATALOG_MEN_PATH=path_to_men
-CATALOG_WOMEN_PATH=path_to_women
-MAX_PAGES=3
-SNEAKERS_WOMEN_URL=https://example.com/women
-SNEAKERS_MEN_URL=https://example.com/men
-MAX_PAGES_BUNT=1
-MAX_PAGES_SNEAK=1
-```
-
-### 5. Run the bot
-```bash
+cp .env.template .env      # then fill in the values
 poetry run python -m sneaker_bot.main
 ```
 
-## Project structure
+You need a bot token from [@BotFather](https://t.me/BotFather) and a channel the
+bot can check subscriptions against.
+
+## Configuration
+
+Everything comes from `.env` (see [`.env.template`](./.env.template)):
+
+| Variable | Purpose |
+|---|---|
+| `SECRET_TOKEN_BOT` | Telegram bot token |
+| `ID_CHANNEL` | Channel used for the subscription check |
+| `NEWS_URL` | RSS feed for the news section |
+| `LAST_HOURS` | How far back to look for news |
+| `MAX_PAGES`, `MAX_PAGES_BUNT`, `MAX_PAGES_SNEAK`, `PER_CAT` | How deep the parsers go |
+| `USER_AGENT` | User-Agent header for HTTP requests |
+| `SNEAKERS_WOMEN_URL`, `SNEAKERS_MEN_URL` | Store catalogue URLs |
+| `BASE_URL`, `CATALOG_MEN_PATH`, `CATALOG_WOMEN_PATH` | Second store's catalogue |
+
+Nothing secret is committed: `.env` is ignored, `.env.template` holds placeholders.
+
+## Docker
+
+```bash
+docker build -t sneaker-bot .
+docker run --rm --env-file .env sneaker-bot
+```
+
+The image installs dependencies from the lock file and starts
+`python -m sneaker_bot.main`.
+
+## Project layout
+
 ```
 sneaker_bot/
-  handlers/        # Command and button handlers
-  menu/            # Keyboards and menus
-  parsers/         # News and price parsers
-  services/        # Service functions (messaging, logic)
-  setting.py       # Bot and dispatcher settings
-  startup.py       # Bot command setup
-  sub_checker.py   # Subscription check
-  tasks.py         # Async task management
-  main.py          # Entry point
+├── handlers/     routers for commands and button callbacks
+├── menu/         keyboards and menu texts
+├── parsers/      price and news parsers
+├── services/     message sending, text building, shared logic
+├── setting.py    bot and dispatcher setup
+├── startup.py    command registration
+├── sub_checker.py subscription check
+├── tasks.py      async task helpers
+└── main.py       entry point
 ```
 
-## Technical details
-- Language: **Python 3.12**
-- Framework: **aiogram 3.x**
-- Dependency management: **Poetry**
-- Web parsing: **aiohttp, BeautifulSoup**
-- Secrets: **python-dotenv**
-- Async: **asyncio**
-- FSM: **aiogram.fsm**
-
-### Architecture
-- All code is split into modules by responsibility.
-- Routers are used for command and button logic.
-- Keyboards are separated for easy editing.
-- All external calls (parsing, messaging) are in services.
-- Task management prevents race conditions and duplicate requests.
-
 ## FAQ
-**Q: The bot won't start, what should I do?**
-- Check that all environment variables are set correctly in .env
-- Make sure Python 3.12 and poetry are installed
-- Check that your bot token is valid
 
-**Q: How to add a new site for parsing?**
-- Add a new function in parsers/price_parser.py and connect it to the main search process.
+**The bot does not start.** Check `.env` — a missing `SECRET_TOKEN_BOT` is the
+usual cause. Then confirm Python 3.12 and Poetry are installed.
 
-**Q: How to change the menu or text?**
-- Edit the corresponding file in menu/ or services/send_messages.py
+**How do I add a store?** Add a parser function in `parsers/price_parser.py` and
+call it from the search flow.
 
-**Q: How to deploy the bot on a server?**
-- Use any VPS with Python 3.12+, set up .env, and run via poetry.
+**How do I change menus or texts?** `menu/` for keyboards,
+`services/send_messages.py` for messages.
 
-## Contributing
-1. Fork the repository
-2. Create a new branch: `git checkout -b feature/your-feature`
-3. Make your changes
-4. Submit a pull request
-5. Describe what and why you changed
+## Authors
+
+- [Kirill](https://github.com/Kirill-cmd-ops) — parsers, handlers, news, the
+  original bot.
+- [Nikita Pugach](https://github.com/Nikita-Pugach) — guided search flow (FSM),
+  price parser fixes, configuration handling, packaging and docs.
 
 ## License
-MIT License. Free to use with attribution.
 
-## Contacts
-- Author: [Kirill](https://github.com/Kirill-cmd-ops) and [Nikita Pugach](https://github.com/Nikita-Pugach)
-- Telegram: [@SkForbes](https://t.me/SkForbes)
-
----
-
-> Project uses [aiogram 3.x](https://docs.aiogram.dev/) and Poetry for dependency management.
+MIT. See [LICENSE](./LICENSE).
