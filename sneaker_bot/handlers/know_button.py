@@ -6,7 +6,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import CallbackQuery, Message
 
 from sneaker_bot.menu.back_menu import back_menu
-from sneaker_bot.parsers.price_parser import process_price_search
+from sneaker_bot.services.price_search import process_price_search
+from sneaker_bot.services.search_query import build_query
 from sneaker_bot.services.send_messages import record_and_send, send_prompt
 from sneaker_bot.services.utils import delete_last_prompt_on_reply
 from sneaker_bot.setting import bot
@@ -124,11 +125,7 @@ async def know_button_size(message: Message, state: FSMContext):
     user_id = message.from_user.id
 
     # формируем запрос: бренд + модель + размер (если указан)
-    q = brand
-    if model:
-        q += f" {model}"
-    if size != "нет":
-        q += f" {size}"
+    q = build_query(brand, model, size)
 
     await state.clear()
 

@@ -1,4 +1,5 @@
 import asyncio
+import logging
 
 from sneaker_bot.setting import bot, dp
 from sneaker_bot.startup import set_commands
@@ -14,4 +15,8 @@ async def main():
 
 
 if __name__ == '__main__':
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+    )
     asyncio.run(main())
