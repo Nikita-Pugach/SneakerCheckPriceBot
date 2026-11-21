@@ -4,6 +4,7 @@ import asyncio
 import logging
 import random
 from typing import Union
+from urllib.parse import urljoin
 
 import aiohttp
 from aiogram.exceptions import TelegramBadRequest
@@ -27,6 +28,7 @@ from sneaker_bot.parsers.price_parser import (
     find_title_and_link,
 )
 from sneaker_bot.services.build_text_parser_price import build_result_text
+from sneaker_bot.services.products import is_new
 from sneaker_bot.services.send_messages import record_and_send
 from sneaker_bot.tasks import tasks
 
@@ -52,6 +54,9 @@ async def _price_of(session: aiohttp.ClientSession, item: tuple[str, str]) -> tu
         response.raise_for_status()
         soup = BeautifulSoup(await response.text(), "lxml")
         price = extract_price(soup)
+        if price and price not in {"—", "ошибка"} and " " not in price:
+            # Both stores are Belarusian and often print the bare number.
+            price = f"{price} BYN"
         return title, price or "—", url
     except Exception as exc:  # a dead product link must not kill the whole search
         logger.warning("price fetch failed for %s: %s", url, exc)
@@ -70,6 +75,7 @@ async def process_price_search(
     query: str,
 ) -> None:
     """Search both stores for `query`, send a sticker and a result message."""
+    logger.info("price search started for user %s, query=%r", user_id, query)
     try:
         temporary: list[dict] = []
         loading = await record_and_send(
@@ -79,6 +85,8 @@ async def process_price_search(
 
         raw_bunt: dict[str, list] = {"muzhskie": [], "zhenskie": []}
         raw_sneakers: dict[str, list] = {"женские": [], "мужские": []}
+        seen_bunt: set[str] = set()
+        seen_sneakers: set[str] = set()
 
         async with aiohttp.ClientSession(headers=HEADERS) as session:
             # bunt.by: catalogue pages
@@ -105,6 +113,8 @@ async def process_price_search(
                         title, url = found
                         if query and query.strip() and query.lower() not in title.lower():
                             continue
+                        if not is_new(seen_bunt, title, url):
+                            continue
                         raw_bunt[key].append((title, url))
                         if len(raw_bunt[key]) >= PER_CAT:
                             break
@@ -127,6 +137,8 @@ async def process_price_search(
                         title, url = found
                         if query and query.strip() and query.lower() not in title.lower():
                             continue
+                        if not is_new(seen_sneakers, title, url):
+                            continue
                         raw_sneakers[kind].append((title, url))
                         if len(raw_sneakers[kind]) >= PER_CAT:
                             break
@@ -144,6 +156,13 @@ async def process_price_search(
         no_results = all(
             len(items) == 0
             for items in list(bunt_prices.values()) + list(sneaker_prices.values())
+        )
+        logger.info(
+            "price search finished for user %s: %s bunt, %s sneakers, no_results=%s",
+            user_id,
+            sum(len(items) for items in bunt_prices.values()),
+            sum(len(items) for items in sneaker_prices.values()),
+            no_results,
         )
 
         sticker = random.choice(FAIL_STICKERS if no_results else SUCCESS_STICKERS)

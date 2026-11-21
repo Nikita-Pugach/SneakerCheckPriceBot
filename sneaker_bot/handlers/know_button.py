@@ -1,4 +1,6 @@
 import asyncio
+import logging
+
 from aiogram import Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
@@ -22,6 +24,16 @@ class KnowPriceSG(StatesGroup):
 
 
 router = Router()
+logger = logging.getLogger(__name__)
+
+SEARCH_TIMEOUT = 150
+
+
+async def _notify(message: Message, text: str) -> None:
+    try:
+        await message.answer(text)
+    except TelegramBadRequest:
+        pass
 
 
 @router.callback_query(lambda c: c.data == "know_button")
@@ -133,9 +145,22 @@ async def know_button_size(message: Message, state: FSMContext):
         prev.cancel()
 
     # запускаем поиск в фоне
-    task = asyncio.create_task(
-        process_price_search(user_id, message, state, q)
-    )
+    async def run_search() -> None:
+        # A task created with create_task swallows its exception into the event
+        # loop, which is how a crash used to leave the user staring at the
+        # "searching..." message forever. Catch everything and say something.
+        try:
+            await asyncio.wait_for(
+                process_price_search(user_id, message, state, q), timeout=SEARCH_TIMEOUT
+            )
+        except asyncio.TimeoutError:
+            logger.warning("price search timed out for user %s", user_id)
+            await _notify(message, "Поиск занял слишком много времени. Попробуйте ещё раз.")
+        except Exception:
+            logger.exception("price search crashed for user %s", user_id)
+            await _notify(message, "Не удалось выполнить поиск. Попробуйте позже.")
+
+    task = asyncio.create_task(run_search())
     tasks[user_id] = task
 
     try:

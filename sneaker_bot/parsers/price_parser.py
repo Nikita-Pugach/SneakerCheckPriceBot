@@ -76,13 +76,26 @@ def extract_price(soup: BeautifulSoup) -> str:
     return normalize_price(soup.get_text(" ", strip=True))
 
 
+def looks_like_slug(text: str) -> bool:
+    """True for machine strings like "nike-air-max-90-dm3975-010".
+
+    Stores often put the URL slug inside the link text, which is useless to a
+    human. Treating it as "not a title" lets the next heuristic find the real one.
+    """
+    text = text.strip()
+    return bool(text) and " " not in text and "-" in text and len(text) > 15
+
+
 def find_title_and_link(card, base: str):
     """Heuristics for a product card: (title, absolute url) or None."""
     # 1) explicit links with meaningful text
     for link in card.find_all("a", href=True):
         text = link.get_text(" ", strip=True)
-        if text and len(text) >= 3 and not re.fullmatch(r"[\d\s\-]+", text):
-            return text, urljoin(base, link["href"])
+        if not text or len(text) < 3 or re.fullmatch(r"[\d\s\-]+", text):
+            continue
+        if looks_like_slug(text):
+            continue
+        return text, urljoin(base, link["href"])
 
     # 2) image alt text
     image = card.find("img", alt=True)
@@ -119,7 +132,7 @@ def find_title_and_link(card, base: str):
         if not card.has_attr(attribute):
             continue
         text = card[attribute].strip()
-        if text and len(text) >= 3:
+        if text and len(text) >= 3 and not looks_like_slug(text):
             href = card.get("data-href") or card.get("data-url") or None
             return text, urljoin(base, href) if href else base
 
