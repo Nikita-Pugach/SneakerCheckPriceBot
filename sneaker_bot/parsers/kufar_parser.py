@@ -34,9 +34,25 @@ def format_price(value) -> str:
     return f"{number:.2f} BYN"
 
 
-def parse_ads(payload: dict, limit: int) -> list[tuple[str, str, str]]:
-    """Turn an API response into (title, price, url) for footwear with a price."""
-    items: list[tuple[str, str, str]] = []
+def _condition_and_region(ad: dict) -> tuple[str, str]:
+    """Kufar keeps everything in ad_parameters; condition and city are useful."""
+    condition = ""
+    region = ""
+    for param in ad.get("ad_parameters") or []:
+        key = str(param.get("p") or "").lower()
+        value = param.get("vl")
+        if not isinstance(value, str):
+            continue
+        if key == "condition" and not condition:
+            condition = value
+        elif key == "region" and not region:
+            region = value
+    return condition, region
+
+
+def parse_ads(payload: dict, limit: int) -> list[dict]:
+    """Turn an API response into offers: footwear, with a price."""
+    items: list[dict] = []
     for ad in payload.get("ads", []):
         title = (ad.get("subject") or "").strip()
         url = (ad.get("ad_link") or "").strip()
@@ -45,7 +61,16 @@ def parse_ads(payload: dict, limit: int) -> list[tuple[str, str, str]]:
             continue
         if not any(hint in title.lower() for hint in FOOTWEAR_HINTS):
             continue
-        items.append((title, price, url))
+        condition, region = _condition_and_region(ad)
+        items.append(
+            {
+                "title": title,
+                "price": price,
+                "url": url,
+                "condition": condition,
+                "region": region,
+            }
+        )
         if len(items) >= limit:
             break
     return items
@@ -53,7 +78,7 @@ def parse_ads(payload: dict, limit: int) -> list[tuple[str, str, str]]:
 
 async def search(
     session: aiohttp.ClientSession, query: str, limit: int = 5
-) -> list[tuple[str, str, str]]:
+) -> list[dict]:
     params = {"query": query or "", "size": max(limit * 4, 20)}
     try:
         async with session.get(SEARCH_URL, params=params, timeout=20) as response:

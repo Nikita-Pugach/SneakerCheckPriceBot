@@ -1,4 +1,4 @@
-"""Kufar JSON parsing: footwear only, priced only."""
+"""Kufar JSON parsing: footwear only, priced only, condition and city kept."""
 
 from sneaker_bot.parsers.kufar_parser import format_price, parse_ads
 
@@ -13,13 +13,42 @@ PAYLOAD = {
     ]
 }
 
+DETAILED = {
+    "ads": [
+        {
+            "subject": "Кроссовки Nike Air Max 90",
+            "price_byn": 25000,
+            "ad_link": "https://kufar/item/9",
+            "ad_parameters": [
+                {"p": "condition", "vl": "Б/у"},
+                {"p": "region", "vl": "Минск"},
+                {"p": "men_shoes_size", "vl": ["42"]},
+            ],
+        }
+    ]
+}
+
 
 def test_only_footwear_with_a_price_survives():
     items = parse_ads(PAYLOAD, limit=10)
-    assert items == [
-        ("Кроссовки Nike Air Max", "250 BYN", "https://kufar/item/1"),
-        ("Ботинки ECCO", "99.50 BYN", "https://kufar/item/4"),
+    assert [item["title"] for item in items] == [
+        "Кроссовки Nike Air Max",
+        "Ботинки ECCO",
     ]
+    assert items[0]["price"] == "250 BYN"
+    assert items[0]["url"] == "https://kufar/item/1"
+
+
+def test_condition_and_region_are_extracted():
+    items = parse_ads(DETAILED, limit=5)
+    assert items[0]["condition"] == "Б/у"
+    assert items[0]["region"] == "Минск"
+
+
+def test_missing_parameters_give_empty_strings():
+    items = parse_ads(PAYLOAD, limit=10)
+    assert items[0]["condition"] == ""
+    assert items[0]["region"] == ""
 
 
 def test_limit_is_respected():

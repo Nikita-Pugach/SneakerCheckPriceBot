@@ -8,4 +8,7 @@ __pycache__/
 .pytest_cache/
 .env.*
 !.env.template
+bot.db
+bot.db-wal
+bot.db-shm
 

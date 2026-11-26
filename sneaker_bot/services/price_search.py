@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import random
+from html import escape
 from typing import Union
 from urllib.parse import urljoin
 
@@ -13,6 +14,7 @@ from aiogram.types import CallbackQuery, Message
 from bs4 import BeautifulSoup
 
 from sneaker_bot.menu.know_menu import know_menu
+from sneaker_bot.menu.results_menu import results_menu
 from sneaker_bot.parsers.kufar_parser import search as kufar_search
 from sneaker_bot.parsers.price_parser import (
     BASE,
@@ -30,8 +32,9 @@ from sneaker_bot.parsers.price_parser import (
     fetch_html,
     find_title_and_link,
 )
-from sneaker_bot.services.build_text_parser_price import build_result_text
+from sneaker_bot.services import history
 from sneaker_bot.services.messages import track
+from sneaker_bot.services.offers import CONDITION_NEW, Offer, render, value_of
 from sneaker_bot.services.products import is_footwear, is_new
 from sneaker_bot.services.send_messages import record_and_send
 from sneaker_bot.tasks import tasks
@@ -66,6 +69,39 @@ def _cards(soup: BeautifulSoup) -> list:
     return cards or soup.select(ANY_CARD_SELECTOR)
 
 
+def _offers_from_shop(shop: str, priced: dict, categories: dict[str, str]) -> list[Offer]:
+    """Turn the per-gender dict into offers; shop items are always new."""
+    offers: list[Offer] = []
+    for key, items in priced.items():
+        category = categories.get(key, "")
+        for title, price, url in items:
+            offers.append(
+                Offer(
+                    shop=shop,
+                    title=title,
+                    price=price,
+                    url=url,
+                    category=category,
+                    condition=CONDITION_NEW,
+                )
+            )
+    return offers
+
+
+def _offers_from_kufar(items: list[dict]) -> list[Offer]:
+    return [
+        Offer(
+            shop="kufar.by",
+            title=item.get("title", ""),
+            price=item.get("price", ""),
+            url=item.get("url", ""),
+            condition=item.get("condition", ""),
+            region=item.get("region", ""),
+        )
+        for item in items
+    ]
+
+
 async def process_price_search(
     user_id: int,
     query_ctx: Union[Message, CallbackQuery],
@@ -77,7 +113,12 @@ async def process_price_search(
     loading = None
     try:
         loading = await record_and_send(
-            query_ctx, state, text="Ищем указанную модель кроссовок и схожие модели…"
+            query_ctx,
+            state,
+            text=(
+                f"🔎 Ищем: <b>{escape(query.strip() or 'все кроссовки')}</b>\n"
+                "Проверяем bunt.by, sneakers.by и kufar.by — обычно 20–40 секунд."
+            ),
         )
 
         raw_bunt: dict[str, list] = {"muzhskie": [], "zhenskie": []}
@@ -165,45 +206,61 @@ async def process_price_search(
                 for key, items in raw_sneakers.items()
             }
 
-            # Kufar returns prices in the search response, no product page needed.
-            extra: dict[str, list] = {}
+            # Kufar returns prices and the item condition in the search response.
             kufar_items = await kufar_search(session, query, PER_CAT)
-            if kufar_items:
-                extra["kufar.by"] = kufar_items
 
-        text = build_result_text(bunt_prices, sneaker_prices, extra)
-        no_results = (
-            all(len(items) == 0 for items in bunt_prices.values())
-            and all(len(items) == 0 for items in sneaker_prices.values())
-            and not any(extra.values())
+        offers = _offers_from_shop(
+            "bunt.by", bunt_prices, {"muzhskie": "Мужские", "zhenskie": "Женские"}
         )
+        offers += _offers_from_shop(
+            "sneakers.by", sneaker_prices, {"мужские": "Мужские", "женские": "Женские"}
+        )
+        offers += _offers_from_kufar(kufar_items)
+
+        prices = [value for value in (value_of(offer) for offer in offers) if value is not None]
+        cheapest = min(prices) if prices else None
+        previous = history.previous_min(user_id, query)
+        try:
+            history.save_search(user_id, query, found=len(prices), min_price=cheapest)
+        except Exception as exc:  # history must never break a search
+            logger.warning("could not save the search to history: %s", exc)
+
         logger.info(
-            "price search finished for user %s: %s bunt, %s sneakers, %s kufar, no_results=%s",
+            "price search finished for user %s: %s priced offers, cheapest=%s",
             user_id,
-            sum(len(items) for items in bunt_prices.values()),
-            sum(len(items) for items in sneaker_prices.values()),
-            len(extra.get("kufar.by", [])),
-            no_results,
+            len(prices),
+            cheapest,
         )
 
-        sticker = random.choice(FAIL_STICKERS if no_results else SUCCESS_STICKERS)
+        sticker = random.choice(FAIL_STICKERS if not prices else SUCCESS_STICKERS)
         sticker_message = await query_ctx.bot.send_sticker(
             chat_id=query_ctx.from_user.id, sticker=sticker
         )
         await track(state, sticker_message)
 
-        if no_results:
+        if not prices:
             await record_and_send(
                 query_ctx, state, text="Ничего не найдено 😔", reply_markup=know_menu
             )
-        else:
-            await record_and_send(
-                query_ctx,
-                state,
-                text=text,
-                reply_markup=know_menu,
-                disable_web_page_preview=True,
-            )
+            return
+
+        text = render(offers, previous_min=previous)
+        sent = await record_and_send(
+            query_ctx,
+            state,
+            text=text,
+            reply_markup=results_menu(),
+            disable_web_page_preview=True,
+        )
+        await state.update_data(
+            results={
+                "query": query,
+                "offers": [offer.to_dict() for offer in offers],
+                "max_price": None,
+                "condition": None,
+                "previous_min": previous,
+            }
+        )
 
     except asyncio.CancelledError:
         logger.info("price search cancelled for user %s", user_id)

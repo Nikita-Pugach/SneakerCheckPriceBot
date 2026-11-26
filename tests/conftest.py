@@ -7,4 +7,16 @@ Nothing here talks to Telegram.
 
 import os
 
+import pytest
+
 os.environ.setdefault("SECRET_TOKEN_BOT", "123456789:" + "A" * 35)
+
+
+@pytest.fixture(autouse=True)
+def reset_search_cooldown():
+    """Every test starts with no cooldown applied to any user."""
+    from sneaker_bot.services import cooldown
+
+    cooldown.reset()
+    yield
+    cooldown.reset()

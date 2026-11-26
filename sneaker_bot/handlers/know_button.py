@@ -16,6 +16,7 @@ from sneaker_bot.menu.search_menu import (
     models_keyboard,
     sizes_keyboard,
 )
+from sneaker_bot.services import cooldown
 from sneaker_bot.services.price_search import process_price_search
 from sneaker_bot.services.search_query import build_query
 from sneaker_bot.services.send_messages import send_prompt
@@ -89,8 +90,26 @@ async def _start_search(ctx, state: FSMContext, user_id: int) -> None:
         data.get("brand", ""), data.get("model", ""), data.get("size", "")
     )
 
+    left = cooldown.remaining(user_id)
+    if left:
+        await _notify(
+            ctx,
+            f"⏳ Не так быстро: следующий поиск можно запустить через {left} с.",
+        )
+        return
+
     await delete_last_prompt_on_reply(state, ctx.bot, _chat_id(ctx))
     await state.clear()
+    launch_search(ctx, state, user_id, query)
+
+
+def launch_search(ctx, state: FSMContext, user_id: int, query: str) -> None:
+    """Cancel the previous search and start a new one.
+
+    The cooldown is marked here, so every entry point (guided search, history
+    replay) is throttled by the same clock.
+    """
+    cooldown.mark(user_id)
 
     if previous := tasks.get(user_id):
         previous.cancel()
@@ -109,8 +128,7 @@ async def _start_search(ctx, state: FSMContext, user_id: int) -> None:
             logger.exception("price search crashed for user %s", user_id)
             await _notify(ctx, "Не удалось выполнить поиск. Попробуйте позже.")
 
-    task = asyncio.create_task(run_search())
-    tasks[user_id] = task
+    tasks[user_id] = asyncio.create_task(run_search())
 
 
 # ------------------------------------------------------------------ entry point

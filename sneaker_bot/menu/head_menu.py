@@ -6,15 +6,19 @@ head_menu = InlineKeyboardMarkup(
     inline_keyboard=[
         [
             InlineKeyboardButton(
-                text="❓Узнать цены❓",
+                text="🔍Узнать цены🔍",
                 callback_data="know_button"
             ),
             InlineKeyboardButton(
-                text="🆕Новости🆕",
+                text="📰Новости📰",
                 callback_data="news_button"
             )
         ],
         [
+            InlineKeyboardButton(
+                text="🕓История🕓",
+                callback_data="history_button"
+            ),
             InlineKeyboardButton(
                 text="🤝Помощь🤝",
                 url=REPO_URL

@@ -62,3 +62,31 @@ def test_extra_store_section():
 
 def test_extra_store_is_not_counted_as_a_result_when_empty():
     assert build_result_text(EMPTY_BUNT, EMPTY_SNEAKERS, {"kufar.by": []}) == NOT_FOUND
+
+
+def test_summary_reports_the_cheapest_price_and_the_count():
+    bunt = {
+        "muzhskie": [("Nike A", "300 BYN", "u1"), ("Nike B", "200 BYN", "u2")],
+        "zhenskie": [],
+    }
+    text = build_result_text(bunt, EMPTY_SNEAKERS)
+
+    assert "Минимум: 200 BYN" in text
+    assert "среднее 250 BYN" in text
+    assert "2 предложения" in text
+
+
+def test_summary_counts_every_shop():
+    bunt = {"muzhskie": [("A", "100 BYN", "u1")], "zhenskie": []}
+    extra = {"kufar.by": [("B", "250 BYN", "u2")]}
+    text = build_result_text(bunt, EMPTY_SNEAKERS, extra)
+
+    assert "Минимум: 100 BYN" in text
+    assert "2 предложения" in text
+
+
+def test_shop_header_shows_its_own_minimum():
+    bunt = {"muzhskie": [("A", "100 BYN", "u1"), ("B", "400 BYN", "u2")], "zhenskie": []}
+    text = build_result_text(bunt, EMPTY_SNEAKERS)
+
+    assert "<b>Магазин:</b> bunt.by · от 100 BYN" in text
