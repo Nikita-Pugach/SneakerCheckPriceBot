@@ -109,3 +109,23 @@ def test_offers_survive_a_round_trip_through_a_dict():
     offer = make(price="250 BYN", condition=CONDITION_USED, region="Гомель")
     restored = Offer.from_dict(offer.to_dict())
     assert restored == offer
+
+
+def test_limit_footer_reports_how_much_is_hidden():
+    offers = [make(title=f"item {index}", price=f"{100 + index} BYN") for index in range(10)]
+    text = render(offers, limit=6)
+    assert "Показано 6 из 10." in text
+
+
+def test_summary_counts_all_offers_not_only_the_visible_page():
+    offers = [make(title=f"item {index}", price=f"{100 + index} BYN") for index in range(10)]
+    text = render(offers, limit=6)
+    assert "Минимум: 100 BYN" in text
+    assert "10 предложений" in text
+
+
+def test_no_footer_when_everything_is_visible():
+    offers = [make(title=f"item {index}", price="100 BYN") for index in range(3)]
+    text = render(offers, limit=6)
+    assert "Показано" not in text
+

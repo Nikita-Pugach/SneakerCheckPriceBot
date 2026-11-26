@@ -7,6 +7,7 @@ from .news_button import router as news_router
 from .know_button import router as know_router
 from .filters import router as filters_router
 from .history_button import router as history_router
+from .text_query import router as text_query_router
 from .other_text import router as other_router
 
 
@@ -19,4 +20,5 @@ router.include_router(news_router)
 router.include_router(know_router)
 router.include_router(filters_router)
 router.include_router(history_router)
+router.include_router(text_query_router)
 router.include_router(other_router)

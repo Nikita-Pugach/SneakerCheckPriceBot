@@ -111,8 +111,13 @@ def render(
     max_price: float | None = None,
     condition: str | None = None,
     previous_min: float | None = None,
+    limit: int | None = None,
 ) -> str:
-    """Build the Telegram message for the offers that pass the filters."""
+    """Build the Telegram message for the offers that pass the filters.
+
+    `limit` shows only the first N offers but keeps the summary for all of them,
+    which is what the "show more" button needs.
+    """
     filtered = apply_filters(offers, max_price=max_price, condition=condition)
     if not filtered:
         if not offers:
@@ -123,9 +128,11 @@ def render(
 
     prices = [value for value in (value_of(o) for o in filtered) if value is not None]
 
+    visible = filtered if limit is None or limit >= len(filtered) else filtered[:limit]
+
     # shop -> category -> offers, keeping the shops in a stable order.
     grouped: dict[str, dict[str, list[Offer]]] = {}
-    for offer in sorted(filtered, key=lambda item: _shop_rank(item.shop)[0]):
+    for offer in sorted(visible, key=lambda item: _shop_rank(item.shop)[0]):
         grouped.setdefault(offer.shop, {}).setdefault(offer.category, []).append(offer)
 
     parts: list[str] = []
@@ -156,4 +163,9 @@ def render(
             header = f"{header}\n{note}" if header else note
 
     body = "\n".join(parts).strip()
-    return f"{header}\n\n{body}" if header else body
+    message = f"{header}\n\n{body}" if header else body
+
+    if len(visible) < len(filtered):
+        message += f"\n\nПоказано {len(visible)} из {len(filtered)}."
+
+    return message

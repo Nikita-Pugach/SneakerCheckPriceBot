@@ -14,7 +14,7 @@ from aiogram.types import CallbackQuery, Message
 from bs4 import BeautifulSoup
 
 from sneaker_bot.menu.know_menu import know_menu
-from sneaker_bot.menu.results_menu import results_menu
+from sneaker_bot.menu.results_menu import PAGE_SIZE, results_menu
 from sneaker_bot.parsers.kufar_parser import search as kufar_search
 from sneaker_bot.parsers.price_parser import (
     BASE,
@@ -32,9 +32,9 @@ from sneaker_bot.parsers.price_parser import (
     fetch_html,
     find_title_and_link,
 )
-from sneaker_bot.services import history
+from sneaker_bot.services import cache, history
 from sneaker_bot.services.messages import track
-from sneaker_bot.services.offers import CONDITION_NEW, Offer, render, value_of
+from sneaker_bot.services.offers import CONDITION_NEW, Offer, apply_filters, render, value_of
 from sneaker_bot.services.products import is_footwear, is_new
 from sneaker_bot.services.send_messages import record_and_send
 from sneaker_bot.tasks import tasks
@@ -102,6 +102,106 @@ def _offers_from_kufar(items: list[dict]) -> list[Offer]:
     ]
 
 
+async def _collect_offers(query: str) -> list[Offer]:
+    """Scrape every shop once and return the offers."""
+    raw_bunt: dict[str, list] = {"muzhskie": [], "zhenskie": []}
+    raw_sneakers: dict[str, list] = {"женские": [], "мужские": []}
+    seen_bunt: set[str] = set()
+    seen_sneakers: set[str] = set()
+
+    async with aiohttp.ClientSession(headers=HEADERS) as session:
+        # bunt.by: catalogue pages
+        for catalogue_url in CATALOGS:
+            if not catalogue_url or not catalogue_url.strip():
+                continue
+            key = "muzhskie" if "muzh" in catalogue_url.lower() else "zhenskie"
+
+            for page in range(1, MAX_PAGES_BUNT + 1):
+                if len(raw_bunt[key]) >= PER_CAT:
+                    break
+                page_url = (
+                    catalogue_url
+                    if page == 1
+                    else urljoin(catalogue_url, f"/page/{page}/")
+                )
+                if page > 1:
+                    await asyncio.sleep(PAGE_DELAY)
+                soup = await fetch_html(session, page_url)
+                if soup is None:
+                    break
+                for card in _cards(soup):
+                    found = find_title_and_link(card, BASE or catalogue_url)
+                    if not found:
+                        continue
+                    title, url = found
+                    if query and query.strip() and query.lower() not in title.lower():
+                        continue
+                    if not is_footwear(title):
+                        continue
+                    if not is_new(seen_bunt, title, url):
+                        continue
+                    raw_bunt[key].append((title, url))
+                    if len(raw_bunt[key]) >= PER_CAT:
+                        break
+
+        # sneakers.by: catalogue pages
+        for kind, base in SNEAKERS.items():
+            if not base or not base.strip():
+                continue
+            for page in range(1, MAX_PAGES_SNEAK + 1):
+                if len(raw_sneakers[kind]) >= PER_CAT:
+                    break
+                page_url = base if page == 1 else f"{base}?page={page}"
+                if page > 1:
+                    await asyncio.sleep(PAGE_DELAY)
+                soup = await fetch_html(session, page_url)
+                if soup is None:
+                    break
+                for card in _cards(soup):
+                    found = find_title_and_link(card, BASE or base)
+                    if not found:
+                        continue
+                    title, url = found
+                    if query and query.strip() and query.lower() not in title.lower():
+                        continue
+                    if not is_footwear(title):
+                        continue
+                    if not is_new(seen_sneakers, title, url):
+                        continue
+                    raw_sneakers[kind].append((title, url))
+                    if len(raw_sneakers[kind]) >= PER_CAT:
+                        break
+
+        # Product pages are fetched with a cap on concurrency: a polite crawl
+        # instead of a hundred parallel requests at a small shop.
+        semaphore = asyncio.Semaphore(PRICE_CONCURRENCY)
+
+        async def priced(item):
+            async with semaphore:
+                return await _price_of(session, item)
+
+        bunt_prices = {
+            key: await asyncio.gather(*[priced(item) for item in items])
+            for key, items in raw_bunt.items()
+        }
+        sneaker_prices = {
+            key: await asyncio.gather(*[priced(item) for item in items])
+            for key, items in raw_sneakers.items()
+        }
+
+        # Kufar returns prices and the item condition in the search response.
+        kufar_items = await kufar_search(session, query, PER_CAT)
+
+    offers = _offers_from_shop(
+        "bunt.by", bunt_prices, {"muzhskie": "Мужские", "zhenskie": "Женские"}
+    )
+    offers += _offers_from_shop(
+        "sneakers.by", sneaker_prices, {"мужские": "Мужские", "женские": "Женские"}
+    )
+    offers += _offers_from_kufar(kufar_items)
+    return offers
+
+
 async def process_price_search(
     user_id: int,
     query_ctx: Union[Message, CallbackQuery],
@@ -112,110 +212,21 @@ async def process_price_search(
     logger.info("price search started for user %s, query=%r", user_id, query)
     loading = None
     try:
-        loading = await record_and_send(
-            query_ctx,
-            state,
-            text=(
-                f"🔎 Ищем: <b>{escape(query.strip() or 'все кроссовки')}</b>\n"
-                "Проверяем bunt.by, sneakers.by и kufar.by — обычно 20–40 секунд."
-            ),
-        )
-
-        raw_bunt: dict[str, list] = {"muzhskie": [], "zhenskie": []}
-        raw_sneakers: dict[str, list] = {"женские": [], "мужские": []}
-        seen_bunt: set[str] = set()
-        seen_sneakers: set[str] = set()
-
-        async with aiohttp.ClientSession(headers=HEADERS) as session:
-            # bunt.by: catalogue pages
-            for catalogue_url in CATALOGS:
-                if not catalogue_url or not catalogue_url.strip():
-                    continue
-                key = "muzhskie" if "muzh" in catalogue_url.lower() else "zhenskie"
-
-                for page in range(1, MAX_PAGES_BUNT + 1):
-                    if len(raw_bunt[key]) >= PER_CAT:
-                        break
-                    page_url = (
-                        catalogue_url
-                        if page == 1
-                        else urljoin(catalogue_url, f"/page/{page}/")
-                    )
-                    if page > 1:
-                        await asyncio.sleep(PAGE_DELAY)
-                    soup = await fetch_html(session, page_url)
-                    if soup is None:
-                        break
-                    for card in _cards(soup):
-                        found = find_title_and_link(card, BASE or catalogue_url)
-                        if not found:
-                            continue
-                        title, url = found
-                        if query and query.strip() and query.lower() not in title.lower():
-                            continue
-                        if not is_footwear(title):
-                            continue
-                        if not is_new(seen_bunt, title, url):
-                            continue
-                        raw_bunt[key].append((title, url))
-                        if len(raw_bunt[key]) >= PER_CAT:
-                            break
-
-            # sneakers.by: catalogue pages
-            for kind, base in SNEAKERS.items():
-                if not base or not base.strip():
-                    continue
-                for page in range(1, MAX_PAGES_SNEAK + 1):
-                    if len(raw_sneakers[kind]) >= PER_CAT:
-                        break
-                    page_url = base if page == 1 else f"{base}?page={page}"
-                    if page > 1:
-                        await asyncio.sleep(PAGE_DELAY)
-                    soup = await fetch_html(session, page_url)
-                    if soup is None:
-                        break
-                    for card in _cards(soup):
-                        found = find_title_and_link(card, BASE or base)
-                        if not found:
-                            continue
-                        title, url = found
-                        if query and query.strip() and query.lower() not in title.lower():
-                            continue
-                        if not is_footwear(title):
-                            continue
-                        if not is_new(seen_sneakers, title, url):
-                            continue
-                        raw_sneakers[kind].append((title, url))
-                        if len(raw_sneakers[kind]) >= PER_CAT:
-                            break
-
-            # Product pages are fetched with a cap on concurrency: a polite crawl
-            # instead of a hundred parallel requests at a small shop.
-            semaphore = asyncio.Semaphore(PRICE_CONCURRENCY)
-
-            async def priced(item):
-                async with semaphore:
-                    return await _price_of(session, item)
-
-            bunt_prices = {
-                key: await asyncio.gather(*[priced(item) for item in items])
-                for key, items in raw_bunt.items()
-            }
-            sneaker_prices = {
-                key: await asyncio.gather(*[priced(item) for item in items])
-                for key, items in raw_sneakers.items()
-            }
-
-            # Kufar returns prices and the item condition in the search response.
-            kufar_items = await kufar_search(session, query, PER_CAT)
-
-        offers = _offers_from_shop(
-            "bunt.by", bunt_prices, {"muzhskie": "Мужские", "zhenskie": "Женские"}
-        )
-        offers += _offers_from_shop(
-            "sneakers.by", sneaker_prices, {"мужские": "Мужские", "женские": "Женские"}
-        )
-        offers += _offers_from_kufar(kufar_items)
+        cached = cache.get(query)
+        if cached is None:
+            loading = await record_and_send(
+                query_ctx,
+                state,
+                text=(
+                    f"🔎 Ищем: <b>{escape(query.strip() or 'все кроссовки')}</b>\n"
+                    "Проверяем bunt.by, sneakers.by и kufar.by — обычно 20–40 секунд."
+                ),
+            )
+            offers = await _collect_offers(query)
+            cache.put(query, [offer.to_dict() for offer in offers])
+        else:
+            offers = [Offer.from_dict(item) for item in cached]
+            logger.info("cache hit for user %s, query=%r", user_id, query)
 
         prices = [value for value in (value_of(offer) for offer in offers) if value is not None]
         cheapest = min(prices) if prices else None
@@ -226,10 +237,11 @@ async def process_price_search(
             logger.warning("could not save the search to history: %s", exc)
 
         logger.info(
-            "price search finished for user %s: %s priced offers, cheapest=%s",
+            "price search finished for user %s: %s priced offers, cheapest=%s, cached=%s",
             user_id,
             len(prices),
             cheapest,
+            cached is not None,
         )
 
         sticker = random.choice(FAIL_STICKERS if not prices else SUCCESS_STICKERS)
@@ -244,12 +256,13 @@ async def process_price_search(
             )
             return
 
-        text = render(offers, previous_min=previous)
+        text = render(offers, previous_min=previous, limit=PAGE_SIZE)
+        total = len(apply_filters(offers))
         sent = await record_and_send(
             query_ctx,
             state,
             text=text,
-            reply_markup=results_menu(),
+            reply_markup=results_menu(has_more=total > PAGE_SIZE),
             disable_web_page_preview=True,
         )
         await state.update_data(
@@ -259,6 +272,7 @@ async def process_price_search(
                 "max_price": None,
                 "condition": None,
                 "previous_min": previous,
+                "shown": PAGE_SIZE,
             }
         )
 

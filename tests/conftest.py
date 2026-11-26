@@ -15,8 +15,10 @@ os.environ.setdefault("SECRET_TOKEN_BOT", "123456789:" + "A" * 35)
 @pytest.fixture(autouse=True)
 def reset_search_cooldown():
     """Every test starts with no cooldown applied to any user."""
-    from sneaker_bot.services import cooldown
+    from sneaker_bot.services import cooldown, cache
 
     cooldown.reset()
+    cache.clear()
     yield
     cooldown.reset()
+    cache.clear()

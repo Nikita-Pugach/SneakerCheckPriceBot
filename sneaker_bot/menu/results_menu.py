@@ -1,8 +1,11 @@
-"""Keyboard under the search results: price cap, condition, history."""
+"""Keyboard under the search results: price cap, condition, history, more."""
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 PRICE_CAPS = [200, 300, 500]
+
+# How many offers one screen shows before "show more".
+PAGE_SIZE = 6
 
 CONDITION_LABELS = {"new": "🆕 Новые", "used": "👟 Б/у", "any": "Любое"}
 
@@ -14,8 +17,9 @@ def _mark(text: str, active: bool) -> str:
 def results_menu(
     max_price: float | None = None,
     condition: str | None = None,
+    has_more: bool = False,
 ) -> InlineKeyboardMarkup:
-    """Price row, condition row, then the navigation row."""
+    """Price row, condition row, the "more" row when needed, then navigation."""
     price_row = [
         InlineKeyboardButton(
             text=_mark(f"до {cap}", max_price == cap),
@@ -45,13 +49,16 @@ def results_menu(
         ),
     ]
 
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            price_row,
-            condition_row,
-            [
-                InlineKeyboardButton(text="🕓 История", callback_data="history_button"),
-                InlineKeyboardButton(text="🏠 В меню", callback_data="back_main"),
-            ],
+    rows = [price_row, condition_row]
+    if has_more:
+        rows.append(
+            [InlineKeyboardButton(text="⬇️ Показать ещё", callback_data="flt:more")]
+        )
+    rows.append(
+        [
+            InlineKeyboardButton(text="🕓 История", callback_data="history_button"),
+            InlineKeyboardButton(text="🏠 В меню", callback_data="back_main"),
         ]
     )
+
+    return InlineKeyboardMarkup(inline_keyboard=rows)
