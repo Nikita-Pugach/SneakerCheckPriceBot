@@ -117,12 +117,24 @@ Nothing secret is committed: `.env` is ignored, `.env.template` holds placeholde
 ## Docker
 
 ```bash
-docker build -t sneaker-bot .
-docker run --rm --env-file .env sneaker-bot
+docker compose up -d --build
+docker compose logs -f
 ```
+
+`docker-compose.yml` mounts `./data` into the container and points
+`DB_PATH` at it, so the search history survives image rebuilds. Without
+that volume every `docker compose up --build` starts with an empty history.
 
 The image installs dependencies from the lock file and starts
 `python -m sneaker_bot.main`.
+
+### Without compose
+
+```bash
+docker build -t sneaker-bot .
+docker run --rm --env-file .env -v "$PWD/data:/app/data" \
+  -e DB_PATH=/app/data/bot.db sneaker-bot
+```
 
 ## Project layout
 

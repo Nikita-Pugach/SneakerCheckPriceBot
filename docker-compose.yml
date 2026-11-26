@@ -1,0 +1,13 @@
+services:
+  bot:
+    build: .
+    container_name: sneaker-bot
+    env_file:
+      - .env
+    environment:
+      # The volume below is mounted at /app/data, so the search history
+      # survives image rebuilds. Locally the bot uses the same ./data folder.
+      DB_PATH: /app/data/bot.db
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

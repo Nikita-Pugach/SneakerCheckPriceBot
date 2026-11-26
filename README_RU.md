@@ -116,11 +116,23 @@ poetry run python -m sneaker_bot.main
 ## Docker
 
 ```bash
-docker build -t sneaker-bot .
-docker run --rm --env-file .env sneaker-bot
+docker compose up -d --build
+docker compose logs -f
 ```
 
+`docker-compose.yml` монтирует `./data` внутрь контейнера и указывает
+`DB_PATH` в эту папку, поэтому история поисков переживает пересборку образа.
+Без volume каждый `docker compose up --build` начинал бы с пустой историей.
+
 Образ ставит зависимости из lock-файла и запускает `python -m sneaker_bot.main`.
+
+### Без compose
+
+```bash
+docker build -t sneaker-bot .
+docker run --rm --env-file .env -v "$PWD/data:/app/data" \
+  -e DB_PATH=/app/data/bot.db sneaker-bot
+```
 
 ## Структура проекта
 

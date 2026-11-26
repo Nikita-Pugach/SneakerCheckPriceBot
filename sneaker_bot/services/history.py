@@ -6,7 +6,9 @@ from datetime import datetime, timezone
 
 from sneaker_bot.services.price_format import format_amount
 
-DEFAULT_PATH = os.getenv("DB_PATH", "bot.db")
+# Inside Docker the volume is mounted at /app/data; locally the same folder is
+# used, so both ways of running share one history.
+DEFAULT_PATH = os.getenv("DB_PATH", os.path.join("data", "bot.db"))
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS searches (
@@ -25,7 +27,11 @@ CREATE INDEX IF NOT EXISTS idx_searches_user ON searches(user_id, id DESC);
 
 
 def _connect(path: str | None = None) -> sqlite3.Connection:
-    connection = sqlite3.connect(path or DEFAULT_PATH, timeout=10)
+    target = path or DEFAULT_PATH
+    parent = os.path.dirname(os.path.abspath(target))
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    connection = sqlite3.connect(target, timeout=10)
     connection.row_factory = sqlite3.Row
     connection.executescript(_SCHEMA)
     return connection

@@ -20,8 +20,8 @@ head_menu = InlineKeyboardMarkup(
                 callback_data="history_button"
             ),
             InlineKeyboardButton(
-                text="🤝Помощь🤝",
-                url=REPO_URL
+                text="❓Помощь❓",
+                callback_data="help_button"
             )
         ],
     ]
